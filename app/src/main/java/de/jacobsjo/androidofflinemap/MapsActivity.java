@@ -35,8 +35,20 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-    }
 
+        // Get a File reference to the MBTiles file.
+        if (!isExternalStorageReadable())
+            return;
+
+        File myMBTiles = new File(getMapsStorageDir("Maps"),"map.mbtiles");
+
+        // Create an instance of MapBoxOfflineTileProvider.
+        provider = new MapBoxOfflineTileProvider(myMBTiles);
+
+        LatLng center = provider.getBounds().getCenter();
+
+      //  lastPosition = new CameraPosition.Builder().target(center).zoom(provider.getMinimumZoom()).build();
+    }
 
     /**
      * Manipulates the map once available.
@@ -55,10 +67,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             @Override
             public boolean onMyLocationButtonClick()
             {
-//                LatLng myLocation = new LatLng(mMap.getMyLocation().getLatitude(),mMap.getMyLocation().getLongitude());
-                LatLng myLocation = new LatLng(55.47, 8.46);
-                CameraUpdate camera_update = CameraUpdateFactory.newLatLngZoom(myLocation,13);
+                if (mMap.getMyLocation() == null) return false;
+                LatLng myLocation = new LatLng(mMap.getMyLocation().getLatitude(),mMap.getMyLocation().getLongitude());
+                int zoom = 13;
+                if (provider.getBounds().contains(myLocation)) {
+                    myLocation = provider.getBounds().getCenter();
+                    zoom = provider.getMinimumZoom();
+                }
+                CameraUpdate camera_update = CameraUpdateFactory.newLatLngZoom(myLocation,zoom);
                 mMap.animateCamera(camera_update);
+
                 return true;
             }
         });
@@ -107,14 +125,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         // Create new TileOverlayOptions instance.
         TileOverlayOptions opts = new TileOverlayOptions();
 
-        // Get a File reference to the MBTiles file.
-        if (!isExternalStorageReadable())
-            return;
 
-        File myMBTiles = new File(getMapsStorageDir("Maps"),"map.mbtiles");
-
-        // Create an instance of MapBoxOfflineTileProvider.
-        provider = new MapBoxOfflineTileProvider(myMBTiles);
 
         // Set the tile provider on the TileOverlayOptions.
         opts.tileProvider(provider);
@@ -124,9 +135,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         // Add a marker in Sydney and move the camera
 
-        LatLng esbjerg = new LatLng(55.47, 8.46);
+        LatLng center = provider.getBounds().getCenter();
       //  mMap.addMarker(new MarkerOptions().position(esbjerg).title("Marker in Esbjerg"));
-        CameraUpdate camera_update = CameraUpdateFactory.newLatLngZoom(esbjerg,13);
+        CameraUpdate camera_update = CameraUpdateFactory.newLatLngZoom(center,provider.getMinimumZoom());
+//        CameraUpdate camera_update = CameraUpdateFactory.newCameraPosition(lastPosition);
         mMap.moveCamera(camera_update);
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
@@ -143,12 +155,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     public File getMapsStorageDir(String mapFolderName) {
         // Get the directory for the app's private pictures directory.
-        File file = new File(Environment.getExternalStoragePublicDirectory(
+        return new File(Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_DOCUMENTS), mapFolderName);
-        if (!file.mkdirs()) {
-            Log.e("file", "Directory not created");
-        }
-        return file;
     }
 
 

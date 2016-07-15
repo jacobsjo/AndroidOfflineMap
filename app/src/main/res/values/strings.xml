@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">AndroidOfflineMap</string>
-    <string name="title_activity_maps">Map</string>
+    <string name="app_name">MBTilesViewer</string>
+    <string name="title_activity_maps">MBTiles Viewer</string>
 </resources>
