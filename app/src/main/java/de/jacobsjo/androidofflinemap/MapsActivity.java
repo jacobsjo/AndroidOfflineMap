@@ -1,19 +1,22 @@
 package de.jacobsjo.androidofflinemap;
 
-import android.content.Context;
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.os.Environment;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 
 import com.cocoahero.android.gmaps.addons.mapbox.MapBoxOfflineTileProvider;
+import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.maps.model.TileOverlay;
 import com.google.android.gms.maps.model.TileOverlayOptions;
 
 import java.io.File;
@@ -22,6 +25,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private GoogleMap mMap;
     MapBoxOfflineTileProvider provider;
+    int oldZoom = 13;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,7 +51,57 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
         mMap.setMapType(GoogleMap.MAP_TYPE_NONE);
+        mMap.setOnMyLocationButtonClickListener(new GoogleMap.OnMyLocationButtonClickListener(){
+            @Override
+            public boolean onMyLocationButtonClick()
+            {
+//                LatLng myLocation = new LatLng(mMap.getMyLocation().getLatitude(),mMap.getMyLocation().getLongitude());
+                LatLng myLocation = new LatLng(55.47, 8.46);
+                CameraUpdate camera_update = CameraUpdateFactory.newLatLngZoom(myLocation,13);
+                mMap.animateCamera(camera_update);
+                return true;
+            }
+        });
+        mMap.setOnCameraChangeListener(new GoogleMap.OnCameraChangeListener(){
+            @Override
+            public void onCameraChange(CameraPosition position) {
 
+                float zoom = position.zoom;
+                boolean updateZoom = false;
+                float minZoom = provider.getMinimumZoom();// 8.0f;
+                float maxZoom = provider.getMaximumZoom();//
+
+                if (zoom > maxZoom){
+                    updateZoom = true;
+                    zoom = maxZoom;
+                }
+
+                if (zoom < minZoom){
+                    updateZoom = true;
+                    zoom = minZoom;
+                }
+
+                if (zoom % 1 != 0) {
+                    updateZoom = true;
+                    if (oldZoom>zoom) zoom = (float) Math.floor((double) zoom);
+                    else zoom = (float) Math.ceil((double) zoom);
+                    zoom = Math.round(zoom);
+                } else {
+                    oldZoom = (int) zoom;
+                }
+
+                if (updateZoom){
+                    oldZoom = (int) zoom;
+                    mMap.animateCamera(CameraUpdateFactory.zoomTo(zoom));
+                }
+
+            }
+        });
+
+        mMap.getUiSettings().setZoomControlsEnabled(true);
+        mMap.getUiSettings().setRotateGesturesEnabled(false);
+        mMap.getUiSettings().setTiltGesturesEnabled(false);
+        mMap.getUiSettings().setCompassEnabled(false);
         // Retrieve GoogleMap instance from MapFragment or elsewhere
 
         // Create new TileOverlayOptions instance.
@@ -66,23 +120,25 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         opts.tileProvider(provider);
 
         // Add the tile overlay to the map.
-        TileOverlay overlay = mMap.addTileOverlay(opts);
+        /*TileOverlay overlay =*/ mMap.addTileOverlay(opts);
 
         // Add a marker in Sydney and move the camera
-        LatLng sydney = new LatLng(55.47, 8.46);
-        mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
-        mMap.set;
+
+        LatLng esbjerg = new LatLng(55.47, 8.46);
+      //  mMap.addMarker(new MarkerOptions().position(esbjerg).title("Marker in Esbjerg"));
+        CameraUpdate camera_update = CameraUpdateFactory.newLatLngZoom(esbjerg,13);
+        mMap.moveCamera(camera_update);
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            mMap.setMyLocationEnabled(true);
+        }
     }
 
     /* Checks if external storage is available to at least read */
     public boolean isExternalStorageReadable() {
         String state = Environment.getExternalStorageState();
-        if (Environment.MEDIA_MOUNTED.equals(state) ||
-                Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
-            return true;
-        }
-        return false;
+        return Environment.MEDIA_MOUNTED.equals(state) ||
+                Environment.MEDIA_MOUNTED_READ_ONLY.equals(state);
     }
 
     public File getMapsStorageDir(String mapFolderName) {
@@ -95,8 +151,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         return file;
     }
 
+
     @Override
-    protected void onPause() {
-        super.onPause();
+    protected void onDestroy() {
+        super.onDestroy();
+        provider.close();
     }
 }
